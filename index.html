@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Simulador Evita V300</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0f1a; --panel:#101826; --panel2:#141f30; --border:#293a4c;
+    --text:#e8edf4; --muted:#8fa1b8; --accent:#3aa0ff; --green:#28c76f;
+    --yellow:#f5b942; --red:#ff4d4f; --turq:#2fd3c9; --radius:14px; --radius-sm:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,sans-serif;}
+  body{min-height:100vh;overscroll-behavior:none;}
+  [hidden]{display:none!important;}
+  .app{display:grid;grid-template-columns:1fr 360px;gap:12px;height:100dvh;padding:10px;}
+  @media (max-width:880px){.app{grid-template-columns:1fr;grid-template-rows:1fr auto;}}
+
+  /* ---------- viewport ---------- */
+  .viewport{position:relative;background:linear-gradient(180deg,#0c1320,#080c14);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+  .hud-top{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;gap:10px;position:relative;z-index:5;}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--muted);}
+  .brand b{color:var(--text);}
+  .hud-btns{display:flex;gap:8px;}
+  .hud-btn{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:8px 10px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .hud-btn:hover{background:rgba(255,255,255,.12);}
+  .hud-btn svg{width:15px;height:15px;}
+
+  .photo-stage{flex:1;display:flex;align-items:center;justify-content:center;padding:12px;min-height:0;position:relative;}
+  .photo-card{position:relative;background:#eef1f6;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden;transform-style:preserve-3d;transition:transform .3s ease;will-change:transform;}
+  .photo-card img{width:100%;height:100%;display:block;object-fit:cover;pointer-events:none;user-select:none;-webkit-user-drag:none;}
+
+  #miniScreen{position:absolute;pointer-events:none;border-radius:2px;}
+
+  .hotspot{position:absolute;width:22px;height:22px;margin-left:-11px;margin-top:-11px;border-radius:50%;border:none;background:transparent;cursor:pointer;padding:0;z-index:4;}
+  .hotspot::before{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(58,160,255,.25);}
+  .hotspot::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid rgba(58,160,255,.55);animation:pulse 2.2s ease-out infinite;pointer-events:none;}
+  .hotspot:hover::before, .hotspot.active::before{background:#fff;}
+  @keyframes pulse{0%{transform:scale(.5);opacity:.9;}100%{transform:scale(1.9);opacity:0;}}
+
+  #pointTip{position:fixed;z-index:50;max-width:260px;background:#0f1826;border:1px solid var(--border);border-radius:12px;padding:12px 14px;box-shadow:0 14px 40px rgba(0,0,0,.55);font-size:12.5px;line-height:1.45;color:var(--text);opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s;pointer-events:none;--arrow-shift:0px;}
+  #pointTip.show{opacity:1;transform:translateY(0);}
+  #pointTip .tip-label{font-weight:700;color:#9fd3ff;margin-bottom:4px;font-size:12.5px;}
+  #pointTip::after{content:"";position:absolute;bottom:-7px;left:calc(50% + var(--arrow-shift));width:14px;height:14px;background:#0f1826;border-right:1px solid var(--border);border-bottom:1px solid var(--border);transform:translateX(-50%) rotate(45deg);}
+
+  .flash-highlight{animation:flashbg 1.1s ease;}
+  @keyframes flashbg{0%{background:rgba(58,160,255,.28);}100%{background:transparent;}}
+
+  /* ---------- panel ---------- */
+  .panel{background:var(--panel);border-radius:var(--radius);display:flex;flex-direction:column;min-height:0;overflow:hidden;border:1px solid var(--border);}
+  .panel-header{padding:14px;border-bottom:1px solid var(--border);}
+  .panel-header h1{font-size:15px;margin:0 0 2px;}
+  .panel-header p{margin:0;font-size:11.5px;color:var(--muted);}
+  .panel-body{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px;}
+
+  .report-btn{display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(245,185,66,.14);border:1px solid rgba(245,185,66,.45);color:#ffd9a0;border-radius:var(--radius-sm);padding:10px 12px;font-size:12.5px;font-weight:600;text-decoration:none;cursor:pointer;}
+  .report-btn svg{width:15px;height:15px;flex:none;}
+
+  #startBtn{background:linear-gradient(180deg,#2f8fe0,#1f6fc2);border:none;color:#fff;font-weight:700;font-size:13.5px;border-radius:var(--radius-sm);padding:12px;cursor:pointer;}
+  #startBtn:disabled{opacity:.4;cursor:not-allowed;}
+  #startBtn.stop{background:linear-gradient(180deg,#e04f4f,#b73434);}
+
+  .section-title{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin:2px 0 0;}
+
+  .checklist{display:flex;flex-direction:column;gap:6px;}
+  .check-row{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:12px;}
+  .check-row .dot{width:9px;height:9px;border-radius:50%;background:#3a4a5f;flex:none;}
+  .check-row.done .dot{background:var(--green);}
+  .check-row.busy .dot{background:var(--yellow);animation:blink 1s infinite;}
+  @keyframes blink{50%{opacity:.3;}}
+  .check-row .lbl{flex:1;color:var(--muted);}
+  .check-row.done .lbl{color:var(--text);}
+
+  .patient-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .patient-btn{background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:8px 4px;font-size:11px;cursor:pointer;text-align:center;}
+  .patient-btn.sel{border-color:var(--accent);background:rgba(58,160,255,.16);}
+
+  .mode-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .mode-chip{background:var(--panel2);border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:6px 11px;font-size:11.5px;cursor:pointer;}
+  .mode-chip.sel{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;}
+  .mode-chip:disabled{opacity:.35;cursor:not-allowed;}
+
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .tile{background:var(--panel2);border:1px solid var(--border);border-radius:12px;padding:9px 10px;display:flex;flex-direction:column;gap:4px;cursor:pointer;position:relative;}
+  .tile.sel{border-color:var(--yellow);box-shadow:0 0 0 2px rgba(245,185,66,.25);}
+  .tile.confirmed{border-color:var(--green);}
+  .tile.warn{animation:tblink .5s infinite;}
+  @keyframes tblink{50%{border-color:var(--red);}}
+  .tile .tl{font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;}
+  .tile .tv{font-size:19px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+  .tile .tv small{font-size:11px;color:var(--muted);font-weight:500;}
+  .tile-controls{display:none;align-items:center;justify-content:space-between;gap:6px;margin-top:2px;}
+  .tile.sel .tile-controls{display:flex;}
+  .tile-controls button{width:26px;height:26px;border-radius:8px;border:1px solid var(--border);background:#0d1420;color:#fff;font-size:15px;cursor:pointer;line-height:1;}
+  .tile-controls input[type=range]{flex:1;accent-color:var(--accent);}
+  .tile .confirm-btn{margin-top:4px;background:var(--green);border:none;color:#04210f;font-weight:700;font-size:11px;border-radius:7px;padding:5px;cursor:pointer;display:none;}
+  .tile.sel .confirm-btn{display:block;}
+
+  .measured-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+  .mbox{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:7px 8px;text-align:center;}
+  .mbox .ml{font-size:9.5px;color:var(--muted);}
+  .mbox .mv{font-size:15px;font-weight:700;font-family:'IBM Plex Mono',monospace;}
+
+  .alarm-banner{display:none;align-items:center;gap:10px;background:rgba(255,77,79,.15);border:1px solid var(--red);color:#ffb3b4;border-radius:10px;padding:9px 12px;font-size:12px;font-weight:600;}
+  .alarm-banner.show{display:flex;}
+  .alarm-banner.agent{background:rgba(245,185,66,.15);border-color:var(--yellow);color:#ffe3a3;}
+  .alarm-banner .abtn{margin-left:auto;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:7px;padding:5px 9px;font-size:11px;cursor:pointer;}
+
+  .disclaimer{font-size:10.5px;color:var(--muted);line-height:1.4;padding-top:4px;border-top:1px solid var(--border);}
+
+  /* modals */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal-box{background:#0f1826;border:1px solid var(--border);border-radius:16px;padding:22px;max-width:420px;width:100%;text-align:center;}
+  .modal-box h2{margin:0 0 4px;font-size:16px;}
+  .modal-box p{color:var(--muted);font-size:12.5px;margin:0 0 14px;}
+  #qrHolder{background:#fff;border-radius:10px;padding:14px;display:inline-block;}
+  .modal-close{margin-top:14px;background:rgba(255,255,255,.08);border:1px solid var(--border);color:#fff;border-radius:9px;padding:8px 16px;cursor:pointer;}
+  #screenModalCanvas{width:100%;background:#000;border-radius:10px;}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:#26334a;border-radius:8px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="viewport">
+    <div class="hud-top">
+      <div class="brand">🫁 <b>Evita V300</b> · Simulador de entrenamiento</div>
+      <div class="hud-btns">
+        <button class="hud-btn" id="btnQr" title="Compartir / QR">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><line x1="14" y1="14" x2="14" y2="21"></line><line x1="21" y1="14" x2="21" y2="21"></line><line x1="14" y1="21" x2="21" y2="21"></line></svg>
+          QR
+        </button>
+        <button class="hud-btn" id="btnFull" title="Pantalla completa">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="photo-stage" id="photoStage">
+      <div class="photo-card" id="photoCard">
+        <img id="equipoImg" src="evita.jpg" alt="Ventilador Dräger Evita V300" draggable="false" />
+        <canvas id="miniScreen"></canvas>
+        <button class="hotspot" style="left:48%;top:14%" data-info="screen" data-target="secModo"></button>
+        <button class="hotspot" style="left:26%;top:27%" data-info="handle" data-target="secPatient"></button>
+        <button class="hotspot" style="left:53%;top:31%" data-info="body" data-target="secModo"></button>
+        <button class="hotspot" style="left:57%;top:39%" data-info="expvalve" data-target="secTiles"></button>
+        <button class="hotspot" style="left:63%;top:39%" data-info="inspunit" data-target="secTiles"></button>
+        <button class="hotspot" style="left:57%;top:44%" data-info="watertrap" data-target="secTiles"></button>
+        <button class="hotspot" style="left:40%;top:32%" data-info="powerswitch" data-target="startBtn"></button>
+        <button class="hotspot" style="left:49%;top:57%" data-info="drawer1" data-target="secAlarms"></button>
+        <button class="hotspot" style="left:49%;top:67%" data-info="drawer2" data-target="secAlarms"></button>
+        <button class="hotspot" style="left:44%;top:86%" data-info="wheels" data-target="secAlarms"></button>
+      </div>
+    </div>
+
+    <div id="pointTip"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <h1>Panel de control</h1>
+      <p>Simulación educativa — no usar con pacientes reales</p>
+    </div>
+    <div class="panel-body">
+
+      <a class="report-btn" id="btnReport" href="https://forms.cloud.microsoft/pages/responsepage.aspx?id=nSO3nW5N-0C5l2sGcs-waD4rOEQBJvxMioyKSdf68CxUNlBPTktOVDFZWExFQllRNTZHNVVJODRKMyQlQCN0PWcu&origin=lprLink&route=shorturl" target="_blank" rel="noopener noreferrer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <span>Reportar daño del equipo</span>
+      </a>
+
+      <button id="startBtn">Encender equipo</button>
+
+      <div id="secChecklist" hidden>
+        <div class="section-title">Chequeo del sistema</div>
+        <div class="checklist">
+          <div class="check-row" id="chkDevice"><div class="dot"></div><div class="lbl">Chequear dispositivo</div></div>
+          <div class="check-row" id="chkCircuit"><div class="dot"></div><div class="lbl">Chequear circuito respiratorio</div></div>
+        </div>
+      </div>
+
+      <div id="secPatient" hidden>
+        <div class="section-title">¿Paciente nuevo?</div>
+        <div class="patient-grid">
+          <button class="patient-btn sel" data-cat="Adulto">Adulto</button>
+          <button class="patient-btn" data-cat="Pediátrico">Pediátrico</button>
+          <button class="patient-btn" data-cat="Neonatal">Neonatal</button>
+        </div>
+      </div>
+
+      <div id="secModo" hidden>
+        <div class="section-title">Modo de ventilación</div>
+        <div class="mode-chips" id="modeChips"></div>
+      </div>
+
+      <div id="secMeasured" hidden>
+        <div class="section-title">Valores medidos</div>
+        <div class="measured-grid">
+          <div class="mbox"><div class="ml">Paw pico</div><div class="mv" id="mPaw">0</div></div>
+          <div class="mbox"><div class="ml">VTe mL</div><div class="mv" id="mVTe">0</div></div>
+          <div class="mbox"><div class="ml">VMe L/min</div><div class="mv" id="mVMe">0.0</div></div>
+          <div class="mbox"><div class="ml">FR /min</div><div class="mv" id="mFR">0</div></div>
+          <div class="mbox"><div class="ml">FiO2 %</div><div class="mv" id="mFiO2">21</div></div>
+          <div class="mbox"><div class="ml">SpO2 %</div><div class="mv" id="mSpO2">--</div></div>
+        </div>
+      </div>
+
+      <div id="secTiles" hidden>
+        <div class="section-title">Ajustes de ventilación</div>
+        <div class="tiles" id="tiles"></div>
+      </div>
+
+      <div id="secAlarms" hidden>
+        <div class="section-title">Alarmas</div>
+        <div class="alarm-banner" id="alarmBanner">
+          <span id="alarmText">Alarma</span>
+          <button class="abtn" id="btnMute">Silenciar 2 min</button>
+        </div>
+        <div class="tiles" style="grid-template-columns:1fr 1fr;margin-top:8px;">
+          <div class="tile" data-key="pmax"><div class="tl"><span>Pmax</span><span>mbar</span></div><div class="tv" id="v_pmax">35</div>
+            <div class="tile-controls"><button class="dec">−</button><input type="range" min="10" max="100" step="1"><button class="inc">+</button></div>
+            <button class="confirm-btn">Confirmar</button></div>
+          <div class="tile" data-key="peep"><div class="tl"><span>PEEP</span><span>mbar</span></div><div class="tv" id="v_peep">5</div>
+            <div class="tile-controls"><button class="dec">−</button><input type="range" min="0" max="35" step="1"><button class="inc">+</button></div>
+            <button class="confirm-btn">Confirmar</button></div>
+        </div>
+      </div>
+
+      <div class="disclaimer">Simulador con fines de capacitación del personal asistencial. Los valores y curvas son ilustrativos y no representan un equipo real conectado a un paciente. Ante cualquier duda clínica, consultar el manual de instrucciones oficial de Dräger.</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="qrModal" hidden>
+  <div class="modal-box">
+    <h2>Compartir simulador</h2>
+    <p>Escanea este código o comparte el enlace de esta página con el equipo asistencial.</p>
+    <div id="qrHolder"></div>
+    <div style="margin-top:10px;"><button class="modal-close" id="closeQr">Cerrar</button></div>
+  </div>
+</div>
+
+<script type="module">
+window.claude = window.claude || {};
+
+/* ---------------- data ---------------- */
+const HOTSPOT_INFO = {
+  screen:{label:"Pantalla Infinity C300", desc:"Unidad de manejo táctil del ventilador. Muestra las curvas de presión, flujo y volumen, y permite ajustar todos los parámetros de ventilación."},
+  handle:{label:"Asa de transporte", desc:"Permite mover el cockpit/pantalla y aloja el codificador rotatorio y la tecla de silenciación de alarmas."},
+  body:{label:"Unidad de respiración", desc:"Contiene el sistema neumático: módulo de dosificación de gas, sensores de presión/flujo y las válvulas de control del equipo."},
+  expvalve:{label:"Válvula de espiración", desc:"Regula la presión y el flujo durante la espiración. Aquí se conecta el tubo espiratorio del sistema de tubos del paciente."},
+  inspunit:{label:"Unidad de inspiración / válvula de seguridad", desc:"Por aquí sale el flujo inspiratorio hacia el paciente. Si el equipo se apaga o falla el suministro, esta válvula permite la respiración espontánea de emergencia."},
+  watertrap:{label:"Trampa de agua", desc:"Recoge la condensación que se acumula en el circuito espiratorio durante la ventilación. Debe revisarse y vaciarse periódicamente."},
+  powerswitch:{label:"Interruptor de encendido", desc:"Enciende y apaga el ventilador. Antes de encenderlo verificar la conexión a la red eléctrica y al suministro central de gases."},
+  drawer1:{label:"Compartimento superior", desc:"Aloja la fuente de alimentación y, si está instalada, la unidad de suministro de gas GS500 (respaldo neumático) o la unidad de alimentación eléctrica PS500 (batería externa)."},
+  drawer2:{label:"Compartimento inferior / carro", desc:"Estructura de soporte del equipo; aloja cableado interno y opciones adicionales según la configuración del hospital."},
+  wheels:{label:"Base con ruedas", desc:"Cuatro ruedas orientables con freno, que permiten desplazar el equipo con seguridad y mantener su estabilidad."}
+};
+
+const PARAMS = [
+  {key:"fio2", label:"FiO₂", unit:"%", min:21, max:100, step:1, def:50, modes:["vc-cmv","pc-cmv","vc-simv","pc-simv","psv"]},
+  {key:"vt", label:"VT", unit:"mL", min:50, max:1500, step:10, def:450, modes:["vc-cmv","vc-simv"]},
+  {key:"pinsp", label:"Pinsp", unit:"mbar", min:5, max:60, step:1, def:15, modes:["pc-cmv","pc-simv"]},
+  {key:"psupp", label:"Psupp", unit:"mbar", min:0, max:40, step:1, def:10, modes:["psv","vc-simv","pc-simv"]},
+  {key:"fr", label:"FR", unit:"/min", min:5, max:60, step:1, def:14, modes:["vc-cmv","pc-cmv","vc-simv","pc-simv"]},
+  {key:"ti", label:"Ti", unit:"s", min:0.2, max:8, step:0.1, def:1.0, modes:["vc-cmv","pc-cmv","vc-simv","pc-simv"]},
+  {key:"flow", label:"Flujo", unit:"L/min", min:6, max:120, step:1, def:30, modes:["vc-cmv","vc-simv"]},
+  {key:"peep", label:"PEEP", unit:"mbar", min:0, max:35, step:1, def:5, modes:["vc-cmv","pc-cmv","vc-simv","pc-simv","psv"]},
+];
+
+const MODES = [
+  {id:"vc-cmv", label:"VC-CMV"},
+  {id:"pc-cmv", label:"PC-CMV"},
+  {id:"vc-simv", label:"VC-SIMV"},
+  {id:"pc-simv", label:"PC-SIMV"},
+  {id:"psv", label:"PSV"},
+];
+
+/* ---------------- state ---------------- */
+const state = {
+  boot: "off", // off, booting, checklist, standby, running
+  category: "Adulto",
+  mode: "vc-cmv",
+  values: {},
+  alarmMuted: false, muteUntil: 0,
+  time: 0,
+};
+PARAMS.forEach(p => state.values[p.key] = p.def);
+state.values.pmax = 35;
+
+let hintPinned = false, hintPinTimer = null, activeHotspotBtn = null;
+
+const $ = sel => document.querySelector(sel);
+const photoStage = $("#photoStage");
+const photoCard = $("#photoCard");
+const startBtn = $("#startBtn");
+const tipEl = $("#pointTip");
+const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------------- photo sizing (exact pixel box, avoids letterboxing) ---------------- */
+const PHOTO_RATIO = 494/699;
+function sizePhotoCard(){
+  const pad = 24;
+  const availW = Math.max(photoStage.clientWidth - pad, 0);
+  const availH = Math.max(photoStage.clientHeight - pad, 0);
+  let w = availH * PHOTO_RATIO;
+  let h = availH;
+  if(w > availW){ w = availW; h = availW / PHOTO_RATIO; }
+  photoCard.style.width = w+"px";
+  photoCard.style.height = h+"px";
+  positionMiniScreen();
+}
+sizePhotoCard();
+window.addEventListener("resize", sizePhotoCard);
+window.addEventListener("orientationchange", sizePhotoCard);
+
+/* mini screen overlay, aligned over the photo's real display area */
+const miniScreen = $("#miniScreen");
+function positionMiniScreen(){
+  const w = photoCard.clientWidth, h = photoCard.clientHeight;
+  const x = w*0.33, y = h*0.067, sw = w*0.245, sh = h*0.123;
+  miniScreen.style.left = x+"px"; miniScreen.style.top = y+"px";
+  miniScreen.style.width = sw+"px"; miniScreen.style.height = sh+"px";
+  miniScreen.width = Math.round(sw*2); miniScreen.height = Math.round(sh*2);
+}
+
+/* ---------------- tooltip ---------------- */
+function showTip(btn){
+  const info = HOTSPOT_INFO[btn.dataset.info];
+  if(!info) return;
+  document.querySelectorAll(".hotspot").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active");
+  activeHotspotBtn = btn;
+  tipEl.innerHTML = `<div class="tip-label">${info.label}</div><div>${info.desc}</div>`;
+  tipEl.classList.add("show");
+  positionTip(btn);
+}
+function hideTip(){
+  tipEl.classList.remove("show");
+  document.querySelectorAll(".hotspot").forEach(b=>b.classList.remove("active"));
+  activeHotspotBtn = null;
+}
+function positionTip(btn){
+  const r = btn.getBoundingClientRect();
+  const tw = tipEl.offsetWidth || 260, th = tipEl.offsetHeight || 90;
+  let left = r.left + r.width/2 - tw/2;
+  let top = r.top - th - 14;
+  const margin = 10;
+  let shift = 0;
+  if(left < margin){ shift = margin - left; left = margin; }
+  if(left + tw > window.innerWidth - margin){ const over = (left+tw) - (window.innerWidth-margin); left -= over; shift += over; }
+  if(top < margin){ top = r.bottom + 14; }
+  tipEl.style.left = left+"px";
+  tipEl.style.top = top+"px";
+  tipEl.style.setProperty("--arrow-shift", (tw/2 - shift - (tw/2))+"px");
+  const arrowX = (r.left + r.width/2) - left - tw/2;
+  tipEl.style.setProperty("--arrow-shift", arrowX+"px");
+}
+
+document.querySelectorAll(".hotspot").forEach(btn=>{
+  btn.addEventListener("mouseenter", ()=> showTip(btn));
+  btn.addEventListener("mouseleave", ()=>{ if(!hintPinned && activeHotspotBtn===btn) hideTip(); });
+  btn.addEventListener("focus", ()=> showTip(btn));
+  btn.addEventListener("blur", ()=>{ if(!hintPinned && activeHotspotBtn===btn) hideTip(); });
+  btn.addEventListener("click", (e)=>{
+    e.stopPropagation();
+    showTip(btn);
+    hintPinned = true;
+    if(hintPinTimer) clearTimeout(hintPinTimer);
+    hintPinTimer = setTimeout(()=>{ hintPinned = false; hideTip(); }, 6000);
+    const targetEl = document.getElementById(btn.dataset.target);
+    if(!targetEl) return;
+    targetEl.hidden = false;
+    targetEl.scrollIntoView({ behavior: reducedMotion?"auto":"smooth", block:"center" });
+    targetEl.classList.remove("flash-highlight");
+    void targetEl.offsetWidth;
+    targetEl.classList.add("flash-highlight");
+  });
+});
+photoStage.addEventListener("click", (e)=>{
+  if(!e.target.closest(".hotspot")){ hintPinned=false; hideTip(); }
+});
+
+/* tilt on hover (desktop) */
+if(window.matchMedia && window.matchMedia("(hover:hover)").matches){
+  photoStage.addEventListener("mousemove",(e)=>{
+    const r = photoCard.getBoundingClientRect();
+    const px = (e.clientX-r.left)/r.width - 0.5, py=(e.clientY-r.top)/r.height - 0.5;
+    photoCard.style.transform = `perspective(900px) rotateY(${px*4}deg) rotateX(${-py*4}deg)`;
+  });
+  photoStage.addEventListener("mouseleave", ()=>{ photoCard.style.transform = "perspective(900px) rotateY(0) rotateX(0)"; });
+}
+
+/* ---------------- fullscreen ---------------- */
+$("#btnFull").addEventListener("click", ()=>{
+  try{
+    const el = document.documentElement;
+    if(!document.fullscreenElement){ (el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen)?.call(el); }
+    else{ (document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen)?.call(document); }
+  }catch(err){}
+});
+
+/* ---------------- QR ---------------- */
+$("#btnQr").addEventListener("click", ()=>{
+  const modal = $("#qrModal");
+  modal.hidden = false;
+  const holder = $("#qrHolder");
+  holder.innerHTML = "";
+  if(window.QRCode){ new QRCode(holder, {text: location.href, width:200, height:200, colorDark:"#0a0f1a", colorLight:"#ffffff"}); }
+});
+$("#closeQr").addEventListener("click", ()=> $("#qrModal").hidden = true);
+$("#qrModal").addEventListener("click", (e)=>{ if(e.target.id==="qrModal") $("#qrModal").hidden = true; });
+
+/* ---------------- boot / checklist flow ---------------- */
+function setBoot(phase){
+  state.boot = phase;
+  updateUI();
+}
+
+startBtn.addEventListener("click", ()=>{
+  if(state.boot === "off"){
+    startBtn.disabled = true;
+    startBtn.textContent = "Iniciando…";
+    setTimeout(()=>{
+      startBtn.disabled = false;
+      setBoot("checklist");
+    }, 2200);
+  } else if(state.boot === "running"){
+    setBoot("standby");
+  } else if(state.boot === "standby"){
+    setBoot("running");
+  }
+});
+
+function runChecklist(){
+  const dev = $("#chkDevice"), cir = $("#chkCircuit");
+  dev.classList.add("busy");
+  setTimeout(()=>{
+    dev.classList.remove("busy"); dev.classList.add("done");
+    cir.classList.add("busy");
+    setTimeout(()=>{
+      cir.classList.remove("busy"); cir.classList.add("done");
+      setBoot("standby");
+    }, 1800);
+  }, 2000);
+}
+
+document.querySelectorAll(".patient-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll(".patient-btn").forEach(b=>b.classList.remove("sel"));
+    btn.classList.add("sel");
+    state.category = btn.dataset.cat;
+  });
+});
+
+function updateUI(){
+  $("#secChecklist").hidden = state.boot !== "checklist";
+  $("#secPatient").hidden = !(state.boot === "standby" || state.boot === "running");
+  $("#secModo").hidden = state.boot !== "running";
+  $("#secMeasured").hidden = state.boot !== "running";
+  $("#secTiles").hidden = state.boot !== "running";
+  $("#secAlarms").hidden = state.boot !== "running";
+
+  if(state.boot === "off"){ startBtn.textContent = "Encender equipo"; startBtn.classList.remove("stop"); }
+  else if(state.boot === "checklist"){ startBtn.textContent = "Chequeo en curso…"; startBtn.disabled = true; runChecklist(); }
+  else if(state.boot === "standby"){ startBtn.disabled=false; startBtn.textContent = "Iniciar terapia"; startBtn.classList.remove("stop"); }
+  else if(state.boot === "running"){ startBtn.disabled=false; startBtn.textContent = "Detener / Standby"; startBtn.classList.add("stop"); }
+
+  if(state.boot === "running") buildTiles();
+}
+
+/* ---------------- mode & tiles ---------------- */
+const modeChips = $("#modeChips");
+MODES.forEach(m=>{
+  const chip = document.createElement("button");
+  chip.className = "mode-chip" + (m.id===state.mode ? " sel":"");
+  chip.textContent = m.label;
+  chip.addEventListener("click", ()=>{
+    state.mode = m.id;
+    document.querySelectorAll(".mode-chip").forEach(c=>c.classList.remove("sel"));
+    chip.classList.add("sel");
+    buildTiles();
+  });
+  modeChips.appendChild(chip);
+});
+
+const tilesEl = $("#tiles");
+function buildTiles(){
+  tilesEl.innerHTML = "";
+  PARAMS.filter(p=> p.modes.includes(state.mode)).forEach(p=>{
+    tilesEl.appendChild(createTile(p));
+  });
+}
+
+function createTile(def){
+  const tile = document.createElement("div");
+  tile.className = "tile";
+  tile.dataset.key = def.key;
+  const val = state.values[def.key];
+  tile.innerHTML = `
+    <div class="tl"><span>${def.label}</span><span>${def.unit}</span></div>
+    <div class="tv"><span class="num">${fmt(val,def.step)}</span></div>
+    <div class="tile-controls">
+      <button class="dec">−</button>
+      <input type="range" min="${def.min}" max="${def.max}" step="${def.step}" value="${val}">
+      <button class="inc">+</button>
+    </div>
+    <button class="confirm-btn">Confirmar</button>
+  `;
+  const numEl = tile.querySelector(".num");
+  const range = tile.querySelector("input[type=range]");
+  const dec = tile.querySelector(".dec"), inc = tile.querySelector(".inc");
+  const confirmBtn = tile.querySelector(".confirm-btn");
+  let pendingVal = val, revertTimer = null, warnTimer = null;
+
+  function openTile(){
+    document.querySelectorAll(".tile.sel").forEach(t=>{ if(t!==tile) closeTile(t); });
+    tile.classList.add("sel");
+    pendingVal = state.values[def.key];
+    range.value = pendingVal;
+    numEl.textContent = fmt(pendingVal, def.step);
+    clearTimeout(revertTimer); clearTimeout(warnTimer);
+    warnTimer = setTimeout(()=> tile.classList.add("warn"), 3800);
+    revertTimer = setTimeout(()=> closeTile(tile), 5000);
+  }
+  function closeTile(t){
+    t.classList.remove("sel","warn");
+    clearTimeout(revertTimer); clearTimeout(warnTimer);
+    numEl.textContent = fmt(state.values[def.key], def.step);
+  }
+  tile.addEventListener("click",(e)=>{
+    if(tile.classList.contains("sel")) return;
+    openTile();
+  });
+  [dec,inc,range,confirmBtn].forEach(el=> el.addEventListener("click", e=> e.stopPropagation()));
+  range.addEventListener("click", e=>e.stopPropagation());
+  range.addEventListener("input", ()=>{
+    pendingVal = parseFloat(range.value);
+    numEl.textContent = fmt(pendingVal, def.step);
+    clearTimeout(revertTimer); clearTimeout(warnTimer); tile.classList.remove("warn");
+    warnTimer = setTimeout(()=> tile.classList.add("warn"), 3800);
+    revertTimer = setTimeout(()=> closeTile(tile), 5000);
+  });
+  dec.addEventListener("click", ()=>{ pendingVal = Math.max(def.min, +(pendingVal-def.step).toFixed(2)); range.value=pendingVal; numEl.textContent=fmt(pendingVal,def.step); });
+  inc.addEventListener("click", ()=>{ pendingVal = Math.min(def.max, +(pendingVal+def.step).toFixed(2)); range.value=pendingVal; numEl.textContent=fmt(pendingVal,def.step); });
+  confirmBtn.addEventListener("click", ()=>{
+    state.values[def.key] = pendingVal;
+    tile.classList.add("confirmed");
+    setTimeout(()=> tile.classList.remove("confirmed"), 900);
+    closeTile(tile);
+  });
+  return tile;
+}
+function fmt(v, step){ return step < 1 ? Number(v).toFixed(1) : Math.round(v); }
+
+/* pmax / peep alarm tiles (static, always visible when running) */
+document.querySelectorAll('[data-key="pmax"], [data-key="peep"]').forEach(tile=>{
+  const key = tile.dataset.key;
+  const numEl = tile.querySelector(".tv");
+  const range = tile.querySelector("input[type=range]");
+  const dec = tile.querySelector(".dec"), inc = tile.querySelector(".inc");
+  const confirmBtn = tile.querySelector(".confirm-btn");
+  let pendingVal = state.values[key];
+  function openTile(){
+    document.querySelectorAll(".tile.sel").forEach(t=>t.classList.remove("sel"));
+    tile.classList.add("sel");
+    pendingVal = state.values[key];
+    range.value = pendingVal;
+  }
+  tile.addEventListener("click", (e)=>{ if(!tile.classList.contains("sel")) openTile(); });
+  [dec,inc,range,confirmBtn].forEach(el=>el.addEventListener("click", e=>e.stopPropagation()));
+  range.addEventListener("input", ()=>{ pendingVal = parseFloat(range.value); numEl.textContent = pendingVal; });
+  dec.addEventListener("click", ()=>{ pendingVal = Math.max(+range.min, pendingVal-1); range.value=pendingVal; numEl.textContent=pendingVal; });
+  inc.addEventListener("click", ()=>{ pendingVal = Math.min(+range.max, pendingVal+1); range.value=pendingVal; numEl.textContent=pendingVal; });
+  confirmBtn.addEventListener("click", ()=>{ state.values[key]=pendingVal; tile.classList.remove("sel"); numEl.textContent = pendingVal; });
+});
+
+/* ---------------- alarms ---------------- */
+const alarmBanner = $("#alarmBanner"), alarmText = $("#alarmText");
+$("#btnMute").addEventListener("click", ()=>{ state.alarmMuted = true; state.muteUntil = Date.now()+120000; });
+
+function evalAlarms(paw){
+  const now = Date.now();
+  if(state.alarmMuted && now > state.muteUntil) state.alarmMuted = false;
+  let msg = null, level = null;
+  if(paw > state.values.pmax){ msg = `⚠ Paw alta — pico ${Math.round(paw)} mbar (límite ${state.values.pmax})`; level="high"; }
+  else if(state.values.peep >= state.values.pmax){ msg = "⚠ PEEP próximo al límite de Pmax"; level="agent"; }
+  if(msg && !state.alarmMuted){
+    alarmBanner.classList.add("show");
+    alarmBanner.classList.toggle("agent", level==="agent");
+    alarmText.textContent = msg;
+  } else {
+    alarmBanner.classList.remove("show");
+  }
+}
+
+/* ---------------- physiology + curves ---------------- */
+let simSpO2 = 97;
+function tickPhysiology(dt){
+  const v = state.values;
+  const mv = state.mode.includes("vc") ? (v.vt * v.fr / 1000) : ((v.pinsp||15) * 0.02 * v.fr);
+  const targetSpO2 = 90 + Math.min(9, mv*1.1) + (v.fio2-21)*0.06;
+  simSpO2 += (Math.min(99, targetSpO2) - simSpO2) * dt * 0.3;
+  $("#mSpO2").textContent = simSpO2.toFixed(0);
+}
+
+const ctx = miniScreen.getContext("2d");
+function breathPhase(t){
+  const fr = Math.max(4, state.values.fr);
+  const period = 60/fr;
+  const ti = Math.min(state.values.ti, period*0.9);
+  const cyc = t % period;
+  return {cyc, period, ti, insp: cyc < ti};
+}
+function drawScreen(t){
+  const w = miniScreen.width, h = miniScreen.height;
+  ctx.clearRect(0,0,w,h);
+  ctx.fillStyle = "#001a12";
+  ctx.fillRect(0,0,w,h);
+  if(state.boot !== "running"){
+    ctx.fillStyle = "#0a3a2a"; ctx.font = `${Math.round(h*0.14)}px IBM Plex Mono, monospace`;
+    ctx.textAlign="center"; ctx.textBaseline="middle";
+    ctx.fillText(state.boot==="off" ? "" : (state.boot==="checklist" ? "Chequeo…" : "Standby"), w/2, h/2);
+    return;
+  }
+  const rows = [ [0, h*0.33, "#3ad1ff", "Paw"], [h*0.34, h*0.34, "#ffd33a", "Flow"], [h*0.7, h*0.3, "#6fff9e", "Vol"] ];
+  const {cyc, period, ti, insp} = breathPhase(t);
+  const v = state.values;
+  const pk = state.mode.includes("pc") ? (v.pinsp + v.peep) : (v.peep + Math.min(45, 8 + v.vt/22));
+  rows.forEach(([y0, rh, color, lbl], idx)=>{
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(1.5, h*0.012); ctx.beginPath();
+    const N = 80;
+    for(let i=0;i<=N;i++){
+      const tt = ((t - (N-i)*0.02) % period + period) % period;
+      let val;
+      if(idx===0){ // Paw
+        val = tt < ti ? v.peep + (pk - v.peep) * Math.min(1, tt/(ti*0.3)) : pk - (pk - v.peep) * (1-Math.exp(-(tt-ti)*3));
+        val = (val - v.peep) / Math.max(5, pk-v.peep);
+      } else if(idx===1){ // flow
+        val = tt < ti ? 1 : -Math.exp(-(tt-ti)*3);
+      } else { // volume
+        val = tt < ti ? Math.min(1, tt/ti) : Math.max(0, 1-((tt-ti)/(period-ti))*3);
+      }
+      const px = w * i/N;
+      const py = y0 + rh - (val*0.9+0.05)*rh;
+      i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  });
+  const paw = insp ? v.peep + (pk-v.peep) * Math.min(1, cyc/(ti*0.3)) : pk - (pk-v.peep)*(1-Math.exp(-(cyc-ti)*3));
+  $("#mPaw").textContent = Math.round(pk);
+  $("#mVTe").textContent = Math.round(state.mode.includes("vc") ? v.vt*0.97 : v.pinsp*22);
+  $("#mVMe").textContent = ((state.mode.includes("vc")?v.vt:v.pinsp*22) * v.fr/1000).toFixed(1);
+  $("#mFR").textContent = v.fr;
+  $("#mFiO2").textContent = v.fio2;
+  evalAlarms(pk);
+}
+
+/* ---------------- main loop ---------------- */
+let lastT = performance.now();
+function loop(now){
+  const dt = Math.min(0.1,(now-lastT)/1000); lastT = now;
+  state.time += dt;
+  if(state.boot === "running") tickPhysiology(dt);
+  drawScreen(state.time);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+updateUI();
+
+/* ---------------- hot reload state (claude sandbox) ---------------- */
+window.claude.hot = window.claude.hot || {};
+window.claude.hot.snapshot = () => ({ boot: state.boot, mode: state.mode, values: state.values, category: state.category });
+window.claude.hot.ready = (snap) => {
+  if(!snap) return;
+  try{
+    state.boot = snap.boot || "off";
+    state.mode = snap.mode || state.mode;
+    Object.assign(state.values, snap.values||{});
+    state.category = snap.category || state.category;
+    updateUI();
+  }catch(e){}
+};
+</script>
+</body>
+</html>
