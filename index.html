@@ -309,6 +309,7 @@ const photoStage = $("#photoStage");
 const photoCard = $("#photoCard");
 const startBtn = $("#startBtn");
 const tipEl = $("#pointTip");
+const miniScreen = $("#miniScreen");
 const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---------------- photo sizing (exact pixel box, avoids letterboxing) ---------------- */
@@ -329,7 +330,6 @@ window.addEventListener("resize", sizePhotoCard);
 window.addEventListener("orientationchange", sizePhotoCard);
 
 /* mini screen overlay, aligned over the photo's real display area */
-const miniScreen = $("#miniScreen");
 function positionMiniScreen(){
   const w = photoCard.clientWidth, h = photoCard.clientHeight;
   const x = w*0.33, y = h*0.067, sw = w*0.245, sh = h*0.123;
